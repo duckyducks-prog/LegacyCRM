@@ -59,12 +59,18 @@ export default function Login() {
         if (elapsed >= totalTime) {
           clearInterval(interval);
           setProgress(100);
-          // Actually log in
+          // Actually log in — extract a display name from the email/username
+          const enteredName = username || 'jsmith';
+          const displayFirst = enteredName.includes('@')
+            ? enteredName.split('@')[0].split('.')[0]
+            : enteredName;
+          const displayFirstCap = displayFirst.charAt(0).toUpperCase() + displayFirst.slice(1);
+
           login({
-            firstName: username || 'John',
-            lastName: null, // Always null for the NULL joke
-            username: username || 'jsmith',
-            email: 'user@company.local',
+            firstName: displayFirstCap,
+            lastName: null, // Always null for the [NULL] joke
+            username: enteredName,
+            email: enteredName.includes('@') ? enteredName : enteredName + '@company.local',
             department: 'Sales (Legacy)',
             role: 'Standard User (Restricted)',
             lastLogin: '47 years ago',
@@ -81,12 +87,11 @@ export default function Login() {
     setLoginError('');
     setCaptchaError('');
 
-    // Validate CAPTCHA (almost always wrong)
-    const normalizedInput = captchaInput.toUpperCase().replace(/0/g, 'O').replace(/1/g, 'I');
-    const normalizedCaptcha = captcha.toUpperCase().replace(/0/g, 'O').replace(/1/g, 'I');
+    // Validate CAPTCHA (almost always wrong... unless they've suffered enough)
+    const mercyThreshold = 5;
+    const hasMercy = captchaAttempts >= mercyThreshold;
 
-    // Be extra strict - require exact match but the captcha itself is ambiguous
-    if (captchaInput !== captcha) {
+    if (!hasMercy && captchaInput !== captcha) {
       setCaptchaAttempts(prev => prev + 1);
 
       const errors = [
@@ -95,12 +100,18 @@ export default function Login() {
         "CAPTCHA mismatch. Note: 0 and O are different characters.",
         "Verification failed. Hint: Some characters may be rotated.",
         "CAPTCHA error. If you're having trouble, contact IT (ext. 4072).",
+        // After 5 attempts, they'll get mercy on the next try
       ];
 
       setCaptchaError(errors[Math.min(captchaAttempts, errors.length - 1)]);
       setCaptcha(generateCaptcha()); // Generate new impossible captcha
       setCaptchaInput('');
       return;
+    }
+
+    // If mercy mode, accept anything but show a condescending message
+    if (hasMercy && captchaInput !== captcha) {
+      setCaptchaError("Close enough. (System override: too many failed attempts.)");
     }
 
     // Start the painfully slow login process
@@ -167,7 +178,7 @@ export default function Login() {
                 id="username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="Enter username (or try anything)"
+                placeholder="e.g. demo@legacycrm.com"
                 autoComplete="off"
               />
             </div>
@@ -238,10 +249,16 @@ export default function Login() {
               <div className="captcha-refresh" onClick={refreshCaptcha}>
                 🔄 Can't read this? Get a new image (equally difficult)
               </div>
-              {captchaAttempts >= 3 && (
+              {captchaAttempts >= 3 && captchaAttempts < 5 && (
                 <div style={{ fontSize: '9px', color: '#666', marginTop: '5px', fontStyle: 'italic' }}>
                   Pro tip: The CAPTCHA is case-sensitive and may contain ambiguous characters.
                   Contact IT if you need accessibility accommodations (form IT-847-ACC required).
+                </div>
+              )}
+              {captchaAttempts >= 5 && (
+                <div style={{ fontSize: '9px', color: '#008000', marginTop: '5px', fontStyle: 'italic' }}>
+                  ✅ Security override engaged. Any input will be accepted.
+                  (Too many failed attempts triggers legacy bypass protocol.)
                 </div>
               )}
             </div>
