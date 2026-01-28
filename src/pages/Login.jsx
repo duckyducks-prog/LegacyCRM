@@ -1,24 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useApp } from '../App';
-import { fakeDelay, getLoadingMessage, calculateProgress } from '../utils/dysfunction';
-
-// Generate impossible CAPTCHA text
-const generateCaptcha = () => {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  const confusingPairs = ['O0', 'Il1', 'S5', 'Z2', 'B8'];
-  let captcha = '';
-
-  // Mix in confusing characters
-  for (let i = 0; i < 7; i++) {
-    if (Math.random() < 0.4 && confusingPairs.length > 0) {
-      const pair = confusingPairs[Math.floor(Math.random() * confusingPairs.length)];
-      captcha += pair[Math.floor(Math.random() * pair.length)];
-    } else {
-      captcha += chars[Math.floor(Math.random() * chars.length)];
-    }
-  }
-  return captcha;
-};
+import { getLoadingMessage, calculateProgress } from '../utils/dysfunction';
 
 export default function Login() {
   const { login } = useApp();
@@ -26,10 +8,6 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true); // Default checked but doesn't work
-  const [captcha, setCaptcha] = useState(generateCaptcha());
-  const [captchaInput, setCaptchaInput] = useState('');
-  const [captchaError, setCaptchaError] = useState('');
-  const [captchaAttempts, setCaptchaAttempts] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
   const [progress, setProgress] = useState(0);
@@ -40,16 +18,16 @@ export default function Login() {
     if (isLoading) {
       const interval = setInterval(() => {
         setLoadingMessage(getLoadingMessage());
-      }, 2000);
+      }, 800);
       return () => clearInterval(interval);
     }
   }, [isLoading]);
 
-  // Progress bar (that goes backwards sometimes)
+  // Quick progress bar
   useEffect(() => {
     if (isLoading) {
       const startTime = Date.now();
-      const totalTime = 8000 + Math.random() * 4000; // 8-12 seconds
+      const totalTime = 1500; // Fast for dev — just 1.5 seconds
 
       const interval = setInterval(() => {
         const elapsed = Date.now() - startTime;
@@ -82,48 +60,14 @@ export default function Login() {
     }
   }, [isLoading, login, username]);
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
     setLoginError('');
-    setCaptchaError('');
 
-    // Validate CAPTCHA (almost always wrong... unless they've suffered enough)
-    const mercyThreshold = 5;
-    const hasMercy = captchaAttempts >= mercyThreshold;
-
-    if (!hasMercy && captchaInput !== captcha) {
-      setCaptchaAttempts(prev => prev + 1);
-
-      const errors = [
-        "CAPTCHA verification failed. Please try again.",
-        "Incorrect CAPTCHA. The characters are case-sensitive.",
-        "CAPTCHA mismatch. Note: 0 and O are different characters.",
-        "Verification failed. Hint: Some characters may be rotated.",
-        "CAPTCHA error. If you're having trouble, contact IT (ext. 4072).",
-        // After 5 attempts, they'll get mercy on the next try
-      ];
-
-      setCaptchaError(errors[Math.min(captchaAttempts, errors.length - 1)]);
-      setCaptcha(generateCaptcha()); // Generate new impossible captcha
-      setCaptchaInput('');
-      return;
-    }
-
-    // If mercy mode, accept anything but show a condescending message
-    if (hasMercy && captchaInput !== captcha) {
-      setCaptchaError("Close enough. (System override: too many failed attempts.)");
-    }
-
-    // Start the painfully slow login process
+    // Start login immediately — no CAPTCHA gate
     setIsLoading(true);
     setLoadingMessage('Contacting server...');
     setProgress(0);
-  };
-
-  const refreshCaptcha = () => {
-    setCaptcha(generateCaptcha());
-    setCaptchaInput('');
-    setCaptchaError('');
   };
 
   if (isLoading) {
@@ -135,21 +79,6 @@ export default function Login() {
           <div className="progress-fill" style={{ width: `${progress}%` }}></div>
         </div>
         <div className="progress-text">{Math.floor(progress)}% complete</div>
-        {progress > 30 && progress < 50 && (
-          <div style={{ marginTop: '15px', fontSize: '10px', color: '#999' }}>
-            Validating license...
-          </div>
-        )}
-        {progress > 60 && progress < 80 && (
-          <div style={{ marginTop: '15px', fontSize: '10px', color: '#999' }}>
-            Loading 847 mandatory plugins...
-          </div>
-        )}
-        {progress > 90 && (
-          <div style={{ marginTop: '15px', fontSize: '10px', color: '#666' }}>
-            Almost there! Preparing personalized experience...
-          </div>
-        )}
       </div>
     );
   }
@@ -215,61 +144,13 @@ export default function Login() {
               </label>
             </div>
 
-            <div className="captcha-container">
-              <div className="captcha-header">
-                🔒 Security Verification (Required)
-              </div>
-              <div className="captcha-image">
-                {captcha.split('').map((char, i) => (
-                  <span
-                    key={i}
-                    style={{
-                      '--rotation': `${(Math.random() - 0.5) * 30}deg`,
-                      '--offset': `${(Math.random() - 0.5) * 8}px`,
-                      color: `hsl(${Math.random() * 60 + 200}, 30%, ${Math.random() * 30 + 30}%)`,
-                      textDecoration: Math.random() > 0.7 ? 'line-through' : 'none',
-                    }}
-                  >
-                    {char}
-                  </span>
-                ))}
-              </div>
-              <input
-                type="text"
-                value={captchaInput}
-                onChange={(e) => setCaptchaInput(e.target.value)}
-                placeholder="Enter the characters above"
-                style={{ marginBottom: '8px' }}
-              />
-              {captchaError && (
-                <div style={{ color: '#cc0000', fontSize: '10px', marginBottom: '8px' }}>
-                  {captchaError}
-                </div>
-              )}
-              <div className="captcha-refresh" onClick={refreshCaptcha}>
-                🔄 Can't read this? Get a new image (equally difficult)
-              </div>
-              {captchaAttempts >= 3 && captchaAttempts < 5 && (
-                <div style={{ fontSize: '9px', color: '#666', marginTop: '5px', fontStyle: 'italic' }}>
-                  Pro tip: The CAPTCHA is case-sensitive and may contain ambiguous characters.
-                  Contact IT if you need accessibility accommodations (form IT-847-ACC required).
-                </div>
-              )}
-              {captchaAttempts >= 5 && (
-                <div style={{ fontSize: '9px', color: '#008000', marginTop: '5px', fontStyle: 'italic' }}>
-                  ✅ Security override engaged. Any input will be accepted.
-                  (Too many failed attempts triggers legacy bypass protocol.)
-                </div>
-              )}
-            </div>
-
             {loginError && (
               <div className="security-notice" style={{ background: '#ffcccc', borderColor: '#cc0000' }}>
                 {loginError}
               </div>
             )}
 
-            <button type="submit" className="login-button">
+            <button type="submit" className="login-button" style={{ marginTop: '15px' }}>
               Sign In to LegacyCRM
             </button>
 
